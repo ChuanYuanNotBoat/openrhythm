@@ -1,0 +1,24 @@
+[metadata]
+id = "com.openrhythm.gameplay.4k"
+name = "传统4K下落式玩法"
+version = "1.0.0"
+author = "OpenRhythm Team"
+description = "经典4键下落式音游玩法，支持Malody谱面格式"
+
+[dependencies]
+core = "^1.0.0"
+audio-service = "^1.0.0"
+render-service = "^1.0.0"
+input-service = "^1.0.0"
+
+[compatibility]
+api-version = "1.0"
+min-core-version = "1.0.0"
+platforms = ["windows", "linux", "macos", "android", "ios"]
+
+[entrypoints]
+gameplay = "gameplay_4k:Gameplay4K"
+
+[resources]
+scripts = ["gameplay_4k.py"]
+assets = ["assets/*.png", "assets/*.ogg"]

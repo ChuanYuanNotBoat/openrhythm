@@ -1,0 +1,66 @@
+# 1. 首先，必须声明这是一个包
+[package]
+name = "openrhythm-core" # 建议的包名，可改为你想要的
+version = "0.1.0"
+edition = "2021" # 与你的Rust 1.91.1版本匹配
+
+# 2. 依赖部分
+[dependencies]
+# 你可以选择直接指定版本（如下方大部分依赖），
+# 或者继承工作区中的版本（如 anyhow = { workspace = true }）
+
+# 基础库 (部分可从工作区继承)
+anyhow = { workspace = true }      # 继承自 workspace.dependencies
+thiserror = { workspace = true }   # 继承自 workspace.dependencies
+log = { workspace = true }         # 继承自 workspace.dependencies
+serde = { workspace = true }       # 继承自 workspace.dependencies
+serde_json = "1.0"
+tokio = { version = "1.38", features = ["rt", "macros"] } # 直接指定，与你的列表一致
+
+# 窗口和输入
+winit = "0.29.15"
+raw-window-handle = "0.6.2"
+
+# 图形渲染
+wgpu = "0.16.3"
+bytemuck = { version = "1.0", features = ["derive"] }
+glam = "0.24"
+
+# Python绑定
+pyo3 = { version = "0.20.3", features = ["extension-module", "abi3-py38"] }
+
+# 实用工具
+chrono = { version = "0.4.34", features = ["serde"] }
+uuid = { version = "1.8.0", features = ["serde", "v4"] }
+toml = "0.8"
+semver = "1.0"
+
+# ================ 音频相关依赖 ================
+cpal = "0.15.2"
+rubato = "0.14.1"
+
+# ================ 其他必要依赖 ================
+image = { version = "0.24", default-features = false, features = ["png", "jpeg", "bmp", "tga"] }
+pathdiff = "0.2"
+directories = "5.0.1"
+hex = "0.4.3"
+crossbeam-channel = { workspace = true } # 继承自 workspace.dependencies
+
+# 压缩和音频处理
+zip = "1.1"
+rodio = { version = "0.17.0", features = ["flac", "vorbis", "wav"] }
+symphonia = { version = "0.5.5", features = ["mp3", "flac", "ogg", "wav", "pcm"] }
+symphonia-bundle-mp3 = "0.5.5"
+symphonia-bundle-flac = "0.5.5"
+symphonia-codec-vorbis = "0.5.5"
+symphonia-format-ogg = "0.5.5"
+symphonia-format-wav = "0.5.5"
+
+# 文件监控
+notify = "8.2.0"
+sha2 = "0.10.9"
+walkdir = "2.5.0"
+
+# 3. 构建依赖
+[build-dependencies]
+pyo3-build-config = "0.20.3"
