@@ -1,13 +1,4 @@
-# Rust编译输出
-/target/
-**/*.rs.bk
-
-# 排除debug构建，但保留release构建
-# 你可以根据需要取消注释以下行
-# !/target/release/
-
 # Python
-__pycache__/
 *.py[cod]
 *$py.class
 *.so
@@ -24,27 +15,69 @@ parts/
 sdist/
 var/
 wheels/
+share/python-wheels/
 *.egg-info/
 .installed.cfg
 *.egg
 MANIFEST
 
-# 虚拟环境
-.env/
-.venv/
+# PyInstaller
+*.manifest
+*.spec
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+cover/
+
+# Environments
+.env
+.venv
 env/
 venv/
 ENV/
 env.bak/
 venv.bak/
 
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
+# Spyder project settings
+.spyderproject
+.spyproject
 
-# 操作系统文件
+# Rope project settings
+.ropeproject
+
+# mkdocs documentation
+/site
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Pyre type checker
+.pyre/
+
+# PyCharm
+.idea/
+
+# VS Code
+.vscode/
+*.code-workspace
+
+# Sublime Text
+*.sublime-*
+
+# OS generated files
 .DS_Store
 .DS_Store?
 ._*
@@ -54,17 +87,54 @@ ehthumbs.db
 Thumbs.db
 
 # Windows
-desktop.ini
+Thumbs.db
+Desktop.ini
 
-# 日志文件
+# Log files
+logs/
 *.log
+
+# Project specific ignores
+# 数据文件夹（用户数据、缓存、谱面等）
+data/beatmaps/**
+data/cache/**
+data/saves/**
+data/scores/**
+data/mods/**
+data/skins/**
+
+# 但是保留目录结构（如果需要保留空文件夹，可以在目录中放一个 .gitkeep 文件）
+!data/beatmaps/.gitkeep
+!data/cache/.gitkeep
+!data/saves/.gitkeep
+!data/scores/.gitkeep
+!data/mods/.gitkeep
+!data/skins/.gitkeep
+
+# 第三方库
+third_party/
 
 # 临时文件
 *.tmp
 *.temp
 
-# 构建缓存
-.pytest_cache/
-.coverage
-.hypothesis/
-.mypy_cache/
+# 配置文件（可以提交示例配置）
+config.json
+!config.example.json
+
+# 音频/图像缓存或临时文件
+*.mp3
+*.wav
+*.ogg
+*.jpg
+*.png
+*.bmp
+*.gif
+
+# 排除 assets 下的生成文件（如果需要）
+assets/images/notes/
+assets/sounds/
+
+# 开发环境配置
+.config/
+.settings/

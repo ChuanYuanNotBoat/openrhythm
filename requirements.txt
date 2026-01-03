@@ -1,0 +1,8 @@
+# mystia_rhythm/requirements.txt
+kivy>=2.3.0
+kivy-garden>=0.1.5
+Pillow>=10.0.0
+numpy>=1.24.0
+pygame>=2.5.0  # 备用音频后端
+python-magic>=0.4.27
+watchdog>=3.0.0  # 文件监控（用于热重载Mod）
