@@ -5,14 +5,12 @@
 import logging
 from pathlib import Path
 
-from kivy.uix.label import Label
 from kivy.uix.image import Image
 from kivy.uix.gridlayout import GridLayout
 from kivy.uix.boxlayout import BoxLayout
-from kivy.uix.button import Button
 from kivy.animation import Animation
 
-from .ui_base import BaseScreen, CustomButton
+from .ui_base import BaseScreen, CustomButton, CustomLabel
 
 logger = logging.getLogger(__name__)
 
@@ -32,10 +30,11 @@ class MenuScreen(BaseScreen):
         main_layout = BoxLayout(orientation='vertical', padding=50, spacing=20)
         
         # 标题
-        title_label = Label(
+        title_label = CustomLabel(
             text='Mystia Rhythm',
             font_size=48,
-            size_hint_y=0.3
+            size_hint_y=0.3,
+            color=[1, 1, 1, 1]
         )
         
         # 按钮容器
@@ -45,7 +44,9 @@ class MenuScreen(BaseScreen):
         start_btn = CustomButton(
             text='开始游戏',
             size_hint_y=None,
-            height=60
+            height=60,
+            background_color=[0.2, 0.6, 0.8, 1],
+            hover_color=[0.3, 0.7, 0.9, 1]
         )
         start_btn.bind(on_release=self._on_start)
         
@@ -53,7 +54,9 @@ class MenuScreen(BaseScreen):
         settings_btn = CustomButton(
             text='设置',
             size_hint_y=None,
-            height=60
+            height=60,
+            background_color=[0.4, 0.4, 0.4, 1],
+            hover_color=[0.5, 0.5, 0.5, 1]
         )
         settings_btn.bind(on_release=self._on_settings)
         
@@ -61,7 +64,9 @@ class MenuScreen(BaseScreen):
         quit_btn = CustomButton(
             text='退出游戏',
             size_hint_y=None,
-            height=60
+            height=60,
+            background_color=[0.8, 0.2, 0.2, 1],
+            hover_color=[0.9, 0.3, 0.3, 1]
         )
         quit_btn.bind(on_release=self._on_quit)
         
@@ -71,10 +76,11 @@ class MenuScreen(BaseScreen):
         button_layout.add_widget(quit_btn)
         
         # 版本信息
-        version_label = Label(
+        version_label = CustomLabel(
             text='v1.0.0',
             font_size=14,
-            size_hint_y=0.1
+            size_hint_y=0.1,
+            color=[0.7, 0.7, 0.7, 1]
         )
         
         # 添加到布局
@@ -106,7 +112,7 @@ class MenuScreen(BaseScreen):
     def _on_settings(self, *args):
         """设置按钮回调"""
         logger.info("打开设置界面")
-        # TODO: 实现设置界面
+        self.parent.current = 'settings'
         
     def _on_quit(self, *args):
         """退出游戏按钮回调"""

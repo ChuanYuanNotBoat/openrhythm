@@ -8,15 +8,15 @@ from typing import List, Dict, Optional, Tuple
 from math import floor
 from pathlib import Path
 
+from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.widget import Widget
 from kivy.graphics import Color, Rectangle, Line, Ellipse, Quad
-from kivy.uix.label import Label
+from kivy.uix.image import Image
 from kivy.animation import Animation
 from kivy.clock import Clock
 from kivy.uix.floatlayout import FloatLayout
-from kivy.uix.image import Image
 
-from .ui_base import BaseScreen
+from .ui_base import BaseScreen, CustomButton, CustomLabel
 from core.chart_parser import Note, NoteType
 from core.judgment_system import Judgment
 from config import config
@@ -172,10 +172,10 @@ class PlayUI(BaseScreen):
         # UI组件
         self.judgment_line: Optional[JudgmentLine] = None
         self.judgment_effect: Optional[JudgmentEffect] = None
-        self.score_label: Optional[Label] = None
-        self.combo_label: Optional[Label] = None
-        self.accuracy_label: Optional[Label] = None
-        self.time_label: Optional[Label] = None
+        self.score_label: Optional[CustomLabel] = None
+        self.combo_label: Optional[CustomLabel] = None
+        self.accuracy_label: Optional[CustomLabel] = None
+        self.time_label: Optional[CustomLabel] = None
         
         # 背景图片
         self.background_image: Optional[Image] = None
@@ -190,7 +190,8 @@ class PlayUI(BaseScreen):
         # 创建UI
         self._create_ui()
         logger.info("游玩界面创建完成")
-        
+
+
     def _create_ui(self) -> None:
         """创建UI组件"""
         logger.debug("开始创建游玩UI组件")
@@ -230,19 +231,70 @@ class PlayUI(BaseScreen):
         # 判定效果
         self.judgment_effect = JudgmentEffect()
         
-        # 分数显示
-        self.score_label = Label(
-            text='Score: 0',
+        # 左上角：歌曲信息
+        self.song_info_label = CustomLabel(
+            text=self._get_song_info(),
+            font_size=16,
+            pos=(20, self.height - 100),
+            size_hint=(None, None),
+            size=(400, 40),
+            color=[1, 1, 1, 1],
+            halign='left'
+        )
+        self.song_info_label.bind(size=self.song_info_label.setter('text_size'))
+        
+        # 右上角：流速显示和调整
+        speed_layout = BoxLayout(orientation='horizontal', spacing=5,
+                                size_hint=(None, None), size=(200, 40),
+                                pos=(self.width - 220, self.height - 100))
+        
+        self.speed_label = CustomLabel(
+            text=f'流速: {self.scroll_speed:.1f}x',
+            size_hint=(0.6, 1),
+            color=[0.8, 0.8, 1, 1]
+        )
+        
+        speed_down_btn = CustomButton(
+            text='-',
+            size_hint=(0.2, 1),
+            font_size=20
+        )
+        speed_down_btn.bind(on_release=lambda x: self._adjust_speed(-0.1))
+        
+        speed_up_btn = CustomButton(
+            text='+',
+            size_hint=(0.2, 1),
+            font_size=20
+        )
+        speed_up_btn.bind(on_release=lambda x: self._adjust_speed(0.1))
+        
+        speed_layout.add_widget(self.speed_label)
+        speed_layout.add_widget(speed_down_btn)
+        speed_layout.add_widget(speed_up_btn)
+        
+        # 左上角：分数显示
+        self.score_label = CustomLabel(
+            text='分数: 0',
             font_size=24,
-            pos=(20, self.height - 50),
+            pos=(20, self.height - 150),
             size_hint=(None, None),
             size=(200, 40),
             color=[1, 1, 1, 1]
         )
         
-        # 连击显示
-        self.combo_label = Label(
-            text='Combo: 0',
+        # 中间顶部：准确率显示
+        self.accuracy_label = CustomLabel(
+            text='准确率: 100.00%',
+            font_size=28,
+            pos_hint={'center_x': 0.5, 'y': 0.9},
+            size_hint=(None, None),
+            size=(300, 50),
+            color=[1, 1, 1, 1]
+        )
+        
+        # 中间：连击显示
+        self.combo_label = CustomLabel(
+            text='连击: 0',
             font_size=32,
             pos_hint={'center_x': 0.5, 'y': 0.7},
             size_hint=(None, None),
@@ -250,18 +302,20 @@ class PlayUI(BaseScreen):
             color=[1, 1, 1, 1]
         )
         
-        # 准确率显示
-        self.accuracy_label = Label(
-            text='Accuracy: 100.00%',
-            font_size=20,
-            pos=(self.width - 220, self.height - 50),
+        # 右上角：判定统计
+        self.judgment_stats_label = CustomLabel(
+            text='BEST: 0\nCOOL: 0\nGOOD: 0\nMISS: 0',
+            font_size=14,
+            pos=(self.width - 150, self.height - 200),
             size_hint=(None, None),
-            size=(200, 40),
-            color=[1, 1, 1, 1]
+            size=(120, 120),
+            color=[1, 1, 1, 0.8],
+            halign='left'
         )
+        self.judgment_stats_label.bind(size=self.judgment_stats_label.setter('text_size'))
         
-        # 时间显示
-        self.time_label = Label(
+        # 底部：时间显示
+        self.time_label = CustomLabel(
             text='00:00 / 00:00',
             font_size=18,
             pos_hint={'center_x': 0.5, 'y': 0.05},
@@ -270,33 +324,136 @@ class PlayUI(BaseScreen):
             color=[1, 1, 1, 0.7]
         )
         
-        # 暂停按钮
-        pause_btn = Label(
-            text='||',
-            font_size=30,
+        # 暂停按钮 - 使用CustomButton
+        self.pause_btn = CustomButton(
+            text='|| 暂停',
+            font_size=24,
             pos_hint={'right': 0.95, 'top': 0.95},
             size_hint=(None, None),
-            size=(50, 50),
-            color=[1, 1, 1, 0.8]
+            size=(100, 50),
+            background_color=[0.2, 0.2, 0.2, 0.8]
         )
-        pause_btn.bind(on_touch_down=self._on_pause_touch)
+        self.pause_btn.bind(on_release=self._on_pause)
+        
+        # 轨道按钮（用于触摸输入）
+        self.lane_buttons = []
+        for i in range(self.lanes):
+            lane_btn = CustomButton(
+                text='',
+                size_hint=(None, None),
+                size=(self.lane_width, 200),
+                pos=(i * self.lane_width, self.judgment_line_y - 100),
+                background_color=[1, 1, 1, 0.1]  # 半透明白色
+            )
+            lane_btn.lane = i
+            lane_btn.bind(
+                on_touch_down=lambda instance, touch, lane=i: self._on_lane_touch(instance, touch, lane)
+            )
+            self.lane_buttons.append(lane_btn)
+            main_container.add_widget(lane_btn)
         
         # 重要：按正确的顺序添加widget到main_container
-        # 1. 背景图片（已添加）
-        # 2. 游戏元素（音符、判定线等）
-        # 3. UI元素（标签、按钮等）
         main_container.add_widget(self.judgment_line)
         main_container.add_widget(self.judgment_effect)
+        main_container.add_widget(self.song_info_label)
+        main_container.add_widget(speed_layout)  # 添加流速调整布局
         main_container.add_widget(self.score_label)
-        main_container.add_widget(self.combo_label)
         main_container.add_widget(self.accuracy_label)
+        main_container.add_widget(self.combo_label)
+        main_container.add_widget(self.judgment_stats_label)
         main_container.add_widget(self.time_label)
-        main_container.add_widget(pause_btn)
+        main_container.add_widget(self.pause_btn)
         
         # 将主容器添加到屏幕
         self.add_widget(main_container)
         
         logger.debug("游玩UI组件创建完成")
+        
+    def _on_lane_touch(self, instance, touch, lane: int):
+        """处理轨道触摸"""
+        if instance.collide_point(*touch.pos):
+            if self.game_engine:
+                self.game_engine.handle_input(lane, True)
+                # 设置定时器释放按键
+                from kivy.clock import Clock
+                Clock.schedule_once(lambda dt: self.game_engine.handle_input(lane, False), 0.1)
+            return True
+        return False
+        
+    def _on_pause(self, instance):
+        """暂停按钮点击事件"""
+        logger.info("点击暂停按钮")
+        if self.game_engine:
+            try:
+                self.game_engine.pause_game()
+            except Exception as e:
+                logger.error(f"暂停游戏失败: {e}")
+        
+    def _get_song_info(self) -> str:
+        """获取歌曲信息"""
+        if not self.game_engine.current_chart:
+            return "未加载谱面"
+            
+        chart = self.game_engine.current_chart
+        return f"{chart.metadata.title} - {chart.metadata.artist}\n难度: {chart.metadata.difficulty}"
+        
+    def _adjust_speed(self, delta: float):
+        """调整流速"""
+        self.scroll_speed = max(0.5, min(10.0, self.scroll_speed + delta))
+        if self.speed_label:
+            self.speed_label.text = f'流速: {self.scroll_speed:.1f}x'
+            
+    def update(self, current_time: float) -> None:
+        """更新UI"""
+        if not self.game_engine.current_chart:
+            return
+            
+        self._update_notes(current_time)
+        
+        # 更新分数
+        if self.score_label:
+            score = self.game_engine.judgment.get_score()
+            self.score_label.text = f'分数: {score:,}'
+            
+        # 更新准确率
+        if self.accuracy_label:
+            accuracy = self.game_engine.judgment.get_accuracy()
+            self.accuracy_label.text = f'准确率: {accuracy:.2f}%'
+            
+        # 更新连击
+        if self.combo_label:
+            combo = self.game_engine.judgment.get_combo()
+            self.combo_label.text = f'连击: {combo}'
+            
+            # 连击颜色效果
+            if combo >= 50:
+                self.combo_label.color = [1, 1, 0, 1]  # 黄色
+            elif combo >= 100:
+                self.combo_label.color = [1, 0.5, 0, 1]  # 橙色
+            elif combo >= 200:
+                self.combo_label.color = [1, 0, 0, 1]  # 红色
+            else:
+                self.combo_label.color = [1, 1, 1, 1]  # 白色
+                
+        # 更新判定统计
+        if self.judgment_stats_label:
+            counts = self.game_engine.judgment.calculator.judgment_counts
+            stats_text = f'BEST: {counts.get("BEST", 0)}\nCOOL: {counts.get("COOL", 0)}\nGOOD: {counts.get("GOOD", 0)}\nMISS: {counts.get("MISS", 0)}'
+            self.judgment_stats_label.text = stats_text
+            
+        # 更新时间显示
+        if self.time_label and self.game_engine.current_chart:
+            duration = self.game_engine.current_chart.metadata.duration
+            if duration > 0:
+                current_str = self._format_time(current_time)
+                total_str = self._format_time(duration)
+                self.time_label.text = f'{current_str} / {total_str}'
+            else:
+                current_str = self._format_time(current_time)
+                self.time_label.text = f'{current_str}'
+                
+        # 重绘
+        self._redraw()
         
     def _update_bg_rect(self, *args):
         """更新背景矩形"""
@@ -317,8 +474,6 @@ class PlayUI(BaseScreen):
             return None
             
         # 获取谱面文件所在目录
-        # 从游戏引擎中获取当前加载的谱面路径
-        # 这里需要在加载谱面时保存谱面文件的路径
         if hasattr(self.game_engine, 'current_chart_path'):
             chart_dir = self.game_engine.current_chart_path.parent
             bg_path = chart_dir / bg_filename
@@ -339,31 +494,7 @@ class PlayUI(BaseScreen):
         # 更新所有音符位置
         for widget in self.note_widgets:
             widget.lane_width = self.lane_width
-            
-    def update(self, current_time: float) -> None:
-        """更新UI"""
-        if not self.game_engine.current_chart:
-            return
-            
-        self._update_notes(current_time)
-        
-        if self.score_label:
-            score = self.game_engine.judgment.get_score()
-            self.score_label.text = f'Score: {score:,}'
-            
-        # 更新准确率
-        if self.accuracy_label:
-            accuracy = self.game_engine.judgment.get_accuracy()
-            self.accuracy_label.text = f'Accuracy: {accuracy:.2f}%'
-            
-        # 更新时间显示
-        if self.time_label and self.game_engine.current_chart.metadata.duration:
-            current_str = self._format_time(current_time)
-            total_str = self._format_time(self.game_engine.current_chart.metadata.duration)
-            self.time_label.text = f'{current_str} / {total_str}'
-            
-        # 重绘
-        self._redraw()
+
         
     def _update_notes(self, current_time: float) -> None:
         """更新音符位置"""
@@ -435,6 +566,9 @@ class PlayUI(BaseScreen):
             
     def _format_time(self, seconds: float) -> str:
         """格式化时间显示"""
+        if seconds <= 0:
+            return "00:00"
+            
         mins = int(seconds // 60)
         secs = int(seconds % 60)
         return f'{mins:02d}:{secs:02d}'
@@ -481,7 +615,7 @@ class PlayUI(BaseScreen):
         """显示连击效果"""
         if combo >= 100:
             # 大数字效果
-            effect = Label(
+            effect = CustomLabel(
                 text=str(combo),
                 font_size=80,
                 pos_hint={'center_x': 0.5, 'center_y': 0.5},
@@ -506,10 +640,16 @@ class PlayUI(BaseScreen):
                 return lane
         return None
         
+
     def _on_pause_touch(self, instance, touch) -> bool:
         """暂停按钮触摸事件"""
         if instance.collide_point(*touch.pos):
-            self.game_engine.pause_game()
+            logger.info("点击暂停按钮")
+            if hasattr(self, 'game_engine') and self.game_engine:
+                try:
+                    self.game_engine.pause_game()
+                except Exception as e:
+                    logger.error(f"暂停游戏失败: {e}")
             return True
         return False
         

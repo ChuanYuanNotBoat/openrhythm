@@ -14,9 +14,14 @@ class CustomButton(Button):
     
     background_color = ListProperty([0.2, 0.2, 0.2, 1])
     hover_color = ListProperty([0.3, 0.3, 0.3, 1])
+    font_name = StringProperty('DefaultFont')  # 改为DefaultFont
     
     def __init__(self, **kwargs):
+        # 确保字体设置
+        if 'font_name' not in kwargs:
+            kwargs['font_name'] = 'DefaultFont'  # 改为DefaultFont
         super().__init__(**kwargs)
+        
         self.bind(
             pos=self._update_rect,
             size=self._update_rect,
@@ -32,15 +37,29 @@ class CustomButton(Button):
             Color(*color)
             RoundedRectangle(pos=self.pos, size=self.size, radius=[10])
             
-    def on_enter(self):
-        """鼠标进入"""
-        self._is_hovering = True
-        self._update_rect()
-        
-    def on_leave(self):
-        """鼠标离开"""
-        self._is_hovering = False
-        self._update_rect()
+    def on_touch_down(self, touch):
+        """处理触摸按下事件"""
+        if self.collide_point(*touch.pos):
+            self._is_hovering = True
+            self._update_rect()
+            return super().on_touch_down(touch)
+        return False
+            
+    def on_touch_up(self, touch):
+        """处理触摸释放事件"""
+        if self.collide_point(*touch.pos):
+            self._is_hovering = False
+            self._update_rect()
+        return super().on_touch_up(touch)
+
+
+class CustomLabel(Label):
+    """自定义标签 - 确保字体正确"""
+    
+    def __init__(self, **kwargs):
+        if 'font_name' not in kwargs:
+            kwargs['font_name'] = 'DefaultFont'  # 改为DefaultFont
+        super().__init__(**kwargs)
 
 
 class BaseScreen(Screen):

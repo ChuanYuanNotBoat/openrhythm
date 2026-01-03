@@ -47,6 +47,9 @@ class AudioClip:
         self._sound = None
         self.loaded = False
         self.duration = 0.0
+        self._playing = False
+        self._position = 0.0  # 当前位置（秒）
+        self._last_play_time = 0.0
         
     def load(self) -> bool:
         """加载音频"""
@@ -81,17 +84,21 @@ class AudioClip:
                 
         try:
             if self.backend == AudioBackend.KIVY:
+                # Kivy没有pause方法，所以我们停止后重新播放
+                if self._playing:
+                    self.stop()
+                
                 self._sound.volume = volume
                 self._sound.play()
-                if start_time > 0:
-                    # Kivy不支持直接跳转，需要重新加载或使用其他方法
-                    pass
+                self._playing = True
+                self._last_play_time = time.time() - start_time
                     
             elif self.backend == AudioBackend.PYGAME:
                 self._sound.set_volume(volume)
                 channel = self._sound.play()
                 if channel and start_time > 0:
                     channel.set_pos(start_time)
+                self._playing = True
                     
             return True
             
@@ -104,8 +111,33 @@ class AudioClip:
         if self.loaded and self._sound:
             try:
                 self._sound.stop()
+                self._playing = False
+                self._position = 0.0
             except:
                 pass
+                
+    def pause(self) -> None:
+        """暂停播放（Kivy后端）"""
+        if not self.loaded or not self._playing:
+            return
+            
+        if self.backend == AudioBackend.KIVY:
+            # 记录当前位置
+            elapsed = time.time() - self._last_play_time
+            self._position = elapsed
+            self._sound.stop()
+            self._playing = False
+        elif self.backend == AudioBackend.PYGAME:
+            # pygame有pause方法
+            self._sound.stop()
+            self._playing = False
+                
+    def resume(self, volume: float = 1.0) -> bool:
+        """恢复播放"""
+        if not self.loaded:
+            return False
+            
+        return self.play(self._position, volume)
                 
     def set_volume(self, volume: float) -> None:
         """设置音量"""
@@ -114,6 +146,10 @@ class AudioClip:
                 self._sound.volume = volume
             except:
                 pass
+                
+    def is_playing(self) -> bool:
+        """是否正在播放"""
+        return self._playing
 
 
 class AudioManager:
@@ -215,19 +251,13 @@ class AudioManager:
         
     def pause_music(self) -> None:
         """暂停背景音乐"""
-        if self.music and self.music.loaded:
-            if self.backend == AudioBackend.KIVY:
-                self.music._sound.pause()
-            elif self.backend == AudioBackend.PYGAME:
-                pygame.mixer.pause()
+        if self.music:
+            self.music.pause()
                 
     def resume_music(self) -> None:
         """恢复背景音乐"""
-        if self.music and self.music.loaded:
-            if self.backend == AudioBackend.KIVY:
-                self.music._sound.play()
-            elif self.backend == AudioBackend.PYGAME:
-                pygame.mixer.unpause()
+        if self.music:
+            self.music.resume(self.master_volume * self.music_volume)
                 
     def seek_music(self, time_sec: float) -> bool:
         """跳转音乐位置"""
@@ -272,7 +302,7 @@ class AudioManager:
             self.config.set('audio.volume_effect', self.effect_volume)
             
         # 更新当前音乐音量
-        if self.music:
+        if self.music and self.music.is_playing():
             self.music.set_volume(self.master_volume * self.music_volume)
             
     def get_music_position(self) -> float:
@@ -280,9 +310,13 @@ class AudioManager:
         if not self.music or not self.music.loaded:
             return 0.0
             
+        # 对于Kivy后端，我们估算位置
         if self.backend == AudioBackend.KIVY:
-            # Kivy没有直接获取位置的方法
-            return 0.0
+            if not self.music._playing:
+                return self.music._position
+            else:
+                elapsed = time.time() - self.music._last_play_time
+                return min(elapsed, self.music.duration)
         elif self.backend == AudioBackend.PYGAME:
             return pygame.mixer.music.get_pos() / 1000.0
             

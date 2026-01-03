@@ -6,6 +6,7 @@ Malody谱面解析器
 import logging
 import json
 import zipfile
+import re
 from pathlib import Path
 from typing import Dict, List, Any, Optional, Tuple
 from dataclasses import dataclass, field
@@ -57,7 +58,10 @@ class ChartMetadata:
     preview_time: float = 0.0
     background: str = ""
     cover: str = ""
-    audio_path: Optional[Path] = None  # 添加音频路径字段
+    audio_path: Optional[Path] = None
+    duration: float = 0.0  # 总时长（秒）
+    mode: int = 0  # 模式编号
+    column: int = 4  # 列数（轨道数）
     
 @dataclass
 class Chart:
@@ -178,16 +182,31 @@ class ChartParser:
         song = meta.get('song', {})
         mode_ext = meta.get('mode_ext', {})
         
+        # 从difficulty中提取等级
+        difficulty = meta.get('version', '')
+        level = 0
+        if difficulty:
+            # 查找 "Lv." 后的数字
+            level_match = re.search(r'Lv\.\s*(\d+)', difficulty)
+            if level_match:
+                level = int(level_match.group(1))
+            # 如果没有明确标记，尝试查找其他数字
+            elif re.search(r'\d+', difficulty):
+                numbers = re.findall(r'\d+', difficulty)
+                level = int(numbers[-1]) if numbers else 0  # 使用最后一个数字
+        
         metadata = ChartMetadata(
             title=song.get('title', ''),
             artist=song.get('artist', ''),
             charter=meta.get('creator', ''),
-            difficulty=meta.get('version', ''),
-            level=meta.get('level', 0),
+            difficulty=difficulty,
+            level=level,
             bpm=120.0,  # 从time中获取
             preview_time=meta.get('preview', 0),
             background=meta.get('background', ''),
-            cover=meta.get('cover', meta.get('background', ''))
+            cover=meta.get('cover', meta.get('background', '')),
+            mode=meta.get('mode', 0),  # 解析mode
+            column=mode_ext.get('column', 4)  # 解析column
         )
         
         # 查找音频文件（从谱面文件中提取或搜索目录）
@@ -276,14 +295,6 @@ class ChartParser:
                 params=params
             ))
             
-        # 创建谱面对象
-        chart = Chart(
-            metadata=metadata,
-            notes=notes,
-            time_events=time_events,
-            effect_events=effect_events
-        )
-        
         # 创建时间系统
         from .timing import TimingSystem
         timing = TimingSystem(metadata.bpm)
@@ -297,7 +308,33 @@ class ChartParser:
             if event.bpm:
                 timing.add_bpm_change(beat_pos, event.bpm)
             
-        chart.timing_system = timing
+        # 计算谱面总时长（基于最后一个音符）
+        if notes:
+            # 找到最大的拍数
+            max_beat = 0.0
+            for note in notes:
+                # 计算音符开始的拍数
+                note_beat = note.beat[0] + note.beat[1] / note.beat[2]
+                if note.endbeat:
+                    end_beat = note.endbeat[0] + note.endbeat[1] / note.endbeat[2]
+                    note_beat = max(note_beat, end_beat)
+                max_beat = max(max_beat, note_beat)
+            
+            # 将最大拍数转换为时间
+            total_time = timing.beat_to_time([int(max_beat), 0, 1])
+            # 加上一个固定的偏移量，比如2秒，确保音符全部落下
+            metadata.duration = total_time + 2.0
+        else:
+            metadata.duration = 0.0
+            
+        # 创建谱面对象
+        chart = Chart(
+            metadata=metadata,
+            notes=notes,
+            time_events=time_events,
+            effect_events=effect_events,
+            timing_system=timing
+        )
         
         # 解析自定义数据（扩展字段）
         custom_data = {}
@@ -355,7 +392,7 @@ class ChartParser:
             'background': chart.metadata.background,
             'version': chart.metadata.difficulty,
             'id': 0,
-            'mode': 0,
+            'mode': chart.metadata.mode,
             'time': 0,  # 时间戳
             'song': {
                 'title': chart.metadata.title,
@@ -363,7 +400,7 @@ class ChartParser:
                 'id': 0
             },
             'mode_ext': {
-                'column': 4,  # 默认4键
+                'column': chart.metadata.column,
                 'bar_begin': 0
             }
         }

@@ -54,7 +54,7 @@ class Config:
         },
         'gameplay': {
             'judgment_offset': 0,
-            'scroll_speed': 1.0,
+            'scroll_speed': 2.0,
             'note_size': 1.0,
             'key_layout': 'standard',
             'lanes': 4,

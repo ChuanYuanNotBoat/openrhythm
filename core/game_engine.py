@@ -1,7 +1,6 @@
 # mystia_rhythm/core/game_engine.py
 """
-游戏引擎主循环
-管理游戏状态、更新和渲染
+游戏引擎主循环 - 修复判定和按键处理
 """
 import logging
 from typing import Dict, List, Optional, Any, Callable
@@ -14,7 +13,6 @@ from kivy.app import App
 from kivy.clock import Clock
 from kivy.core.window import Window
 from kivy.uix.widget import Widget
-from kivy.graphics import Color, Rectangle, Line, Ellipse
 
 from .timing import GameClock, TimingSystem
 from .audio_manager import AudioManager
@@ -96,8 +94,9 @@ class GameEngine:
         # 设置窗口事件
         Window.bind(on_key_down=self._on_key_down)
         Window.bind(on_key_up=self._on_key_up)
-        Window.bind(on_touch_down=self._on_touch_down)
-        Window.bind(on_touch_up=self._on_touch_up)
+        # 注释掉触摸事件，让UI自己处理触摸
+        # Window.bind(on_touch_down=self._on_touch_down)
+        # Window.bind(on_touch_up=self._on_touch_up)
         
         logger.debug(f"游戏参数 - 轨道: {self.lanes}, 滚动速度: {self.scroll_speed}, 音符大小: {self.note_size}")
         
@@ -156,14 +155,30 @@ class GameEngine:
             return
             
         self.reset_game()
+        
+        # 确保音频加载
+        if self.current_chart.metadata.audio_path:
+            audio_loaded = self.audio.load_music(self.current_chart.metadata.audio_path)
+            if not audio_loaded:
+                logger.warning("音频加载失败，但继续游戏")
+        else:
+            logger.warning("没有音频文件")
+            
+        # 开始音乐播放
+        if self.current_chart.metadata.audio_path:
+            self.audio.play_music()
+            
         self.is_playing = True
-        self.audio.play_music()
         self._trigger_callbacks('on_game_start')
         self.change_state(GameState.PLAYING)
         logger.debug("游戏状态: 游玩中")
         
     def pause_game(self) -> None:
         """暂停游戏"""
+        if self.state == GameState.PAUSED:
+            logger.debug("游戏已经在暂停状态")
+            return
+            
         logger.info("游戏暂停")
         if not self.is_playing:
             logger.debug("游戏未在运行中")
@@ -175,19 +190,41 @@ class GameEngine:
         self.change_state(GameState.PAUSED)
         logger.debug("游戏状态: 暂停")
         
+        # 切换到暂停界面
+        if hasattr(self, 'app') and self.app and hasattr(self.app, 'screen_manager'):
+            logger.info("切换到暂停界面")
+            try:
+                self.app.screen_manager.current = 'pause'
+            except Exception as e:
+                logger.error(f"切换到暂停界面失败: {e}")
+        else:
+            logger.error("无法切换到暂停界面：screen_manager 不可用")
+        
     def resume_game(self) -> None:
         """恢复游戏"""
-        logger.info("游戏恢复")
-        if self.is_playing:
-            logger.debug("游戏已在运行中")
+        if self.state == GameState.PLAYING:
+            logger.debug("游戏已经在运行状态")
             return
             
-        self.is_playing = True
-        self.clock.resume()
+        logger.info("游戏恢复")
+        
+        # 先恢复音乐
         self.audio.resume_music()
+        
+        # 然后恢复时钟和状态
+        self.clock.resume()
+        self.is_playing = True
         self.change_state(GameState.PLAYING)
         logger.debug("游戏状态: 游玩中")
         
+        # 切换到游玩界面
+        if hasattr(self, 'app') and self.app and hasattr(self.app, 'screen_manager'):
+            logger.info("切换到游玩界面")
+            try:
+                self.app.screen_manager.current = 'play'
+            except Exception as e:
+                logger.error(f"切换到游玩界面失败: {e}")
+                
     def end_game(self) -> None:
         """结束游戏"""
         logger.info(f"游戏结束 - 分数: {self.judgment.get_score()}, 准确率: {self.judgment.get_accuracy():.2f}%")
@@ -198,9 +235,12 @@ class GameEngine:
         logger.debug("游戏状态: 结算")
         
         # 切换到结算界面
-        if self.app and self.app.screen_manager:
+        if hasattr(self, 'app') and self.app and hasattr(self.app, 'screen_manager'):
+            logger.info("切换到结算界面")
             self.app.screen_manager.current = 'result'
-        
+        else:
+            logger.error("无法切换到结算界面：screen_manager 不可用")
+            
     def update(self, dt: float) -> None:
         """更新游戏逻辑"""
         # 更新时钟
@@ -233,24 +273,31 @@ class GameEngine:
             
         # 获取当前时间和判定窗口
         current_time = self.current_time
-        judgment_window = self.judgment.windows.good / 1000.0  # 转换为秒
+        judgment_window = 0.12  # 120ms转换为秒
         
         # 检查每个音符
         for i, note in enumerate(self.notes):
             note_time = self.note_times[i]
             
+            # 检查时间是否有效
+            if note_time is None:
+                continue
+                
             # 如果音符已经经过判定窗口，自动判定为MISS
             if current_time > note_time + judgment_window and i not in self.judgment.judged_notes:
                 # 自动MISS
-                result = self.judgment.calculator.add_judgment(Judgment.MISS)
-                result.offset = (current_time - note_time) * 1000
-                self.judgment.judged_notes[i] = result
-                
-                # 触发回调
-                self._trigger_callbacks('on_note_miss', result)
-                self._trigger_callbacks('on_combo_change', self.judgment.get_combo())
-                self._trigger_callbacks('on_score_change', self.judgment.get_score())
-                
+                result = self.judgment.judge_note(note, current_time, note_time, True)
+                if result:
+                    self.judgment.judged_notes[i] = result
+                    
+                    # 触发回调
+                    try:
+                        self._trigger_callbacks('on_note_miss', result)
+                        self._trigger_callbacks('on_combo_change', self.judgment.get_combo())
+                        self._trigger_callbacks('on_score_change', self.judgment.get_score())
+                    except Exception as e:
+                        logger.error(f"触发回调失败: {e}")
+                        
     def handle_input(self, lane: int, pressed: bool) -> None:
         """
         处理输入
@@ -259,7 +306,7 @@ class GameEngine:
             lane: 轨道编号 (0-3)
             pressed: 是否按下
         """
-        if not self.is_playing or lane < 0 or lane >= self.lanes:
+        if not self.is_playing or self.state != GameState.PLAYING or lane < 0 or lane >= self.lanes:
             return
             
         self.keys_pressed[lane] = pressed
@@ -274,7 +321,7 @@ class GameEngine:
             return
             
         current_time = self.current_time
-        judgment_window = self.judgment.windows.good / 1000.0
+        judgment_window = 0.12  # 120ms转换为秒
         
         # 查找在判定窗口内的音符
         for i, note in enumerate(self.notes):
@@ -287,6 +334,9 @@ class GameEngine:
                 continue
                 
             note_time = self.note_times[i]
+            if note_time is None:
+                continue
+                
             time_diff = abs(current_time - note_time)
             
             # 如果在判定窗口内
@@ -373,25 +423,6 @@ class GameEngine:
                 self.handle_input(lane, False)
                 return True
                 
-        return False
-        
-    def _on_touch_down(self, window, touch):
-        """处理触摸按下事件"""
-        # 在移动端，需要将触摸位置映射到轨道
-        if self.play_ui:
-            lane = self.play_ui.get_lane_from_touch(touch.x, touch.y)
-            if lane is not None:
-                self.handle_input(lane, True)
-                touch.ud['lane'] = lane
-                return True
-        return False
-        
-    def _on_touch_up(self, window, touch):
-        """处理触摸释放事件"""
-        if 'lane' in touch.ud:
-            lane = touch.ud['lane']
-            self.handle_input(lane, False)
-            return True
         return False
         
     def _get_key_map(self, layout: str) -> Dict[int, List[int]]:

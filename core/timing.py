@@ -186,6 +186,15 @@ class GameClock:
         self.paused = False
         self.time_scale = 1.0  # 时间缩放
         self.audio_offset = 0.0  # 音频延迟补偿
+        self._last_update_time = 0.0  # 最后更新时间
+        
+    def start(self) -> None:
+        """开始/重置时钟"""
+        self.real_time = 0.0
+        self.game_time = 0.0
+        self.paused = False
+        self.time_scale = 1.0
+        self._last_update_time = time.time()
         
     def update(self, dt: float) -> None:
         """更新时钟"""
@@ -215,7 +224,4 @@ class GameClock:
         
     def reset(self) -> None:
         """重置时钟"""
-        self.real_time = 0.0
-        self.game_time = 0.0
-        self.paused = False
-        self.time_scale = 1.0
+        self.start()
